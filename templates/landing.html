@@ -103,4 +103,59 @@
     </div>
 </section>
 
+<div class="video-modal-overlay" id="video-modal-overlay">
+    <div class="video-modal" id="video-modal">
+        <button type="button" class="video-modal-close" id="video-modal-close" aria-label="Close video">&times;</button>
+        <div class="video-modal-frame">
+            <iframe
+                id="video-modal-iframe"
+                data-src="https://www.youtube.com/embed/dQw4w9WgXcQ"
+                title="How Spendly works"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen>
+            </iframe>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (function () {
+        var trigger = document.getElementById('see-how-it-works');
+        var overlay = document.getElementById('video-modal-overlay');
+        var modal = document.getElementById('video-modal');
+        var closeBtn = document.getElementById('video-modal-close');
+        var iframe = document.getElementById('video-modal-iframe');
+        var videoSrc = iframe.getAttribute('data-src');
+
+        function openModal(e) {
+            e.preventDefault();
+            iframe.setAttribute('src', videoSrc + '?autoplay=1');
+            overlay.classList.add('is-open');
+        }
+
+        function closeModal() {
+            overlay.classList.remove('is-open');
+            iframe.setAttribute('src', '');
+        }
+
+        trigger.addEventListener('click', openModal);
+        closeBtn.addEventListener('click', closeModal);
+
+        overlay.addEventListener('click', function (e) {
+            if (!modal.contains(e.target)) {
+                closeModal();
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && overlay.classList.contains('is-open')) {
+                closeModal();
+            }
+        });
+    })();
+</script>
 {% endblock %}
