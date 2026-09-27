@@ -1,6 +1,15 @@
 from flask import Flask, render_template
 
+from database.db import get_db, init_app, init_db, seed_db
+
 app = Flask(__name__)
+init_app(app)
+
+# Create the schema and the demo data before any route is served. Both calls
+# are idempotent, so the Flask reloader re-running this module is harmless.
+with app.app_context():
+    init_db()
+    seed_db()
 
 
 # ------------------------------------------------------------------ #
