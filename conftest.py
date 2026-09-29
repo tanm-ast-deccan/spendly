@@ -42,3 +42,34 @@ def db(app):
     with app.app_context():
         db_module.init_db()
         yield db_module.get_db()
+
+
+@pytest.fixture
+def spendly_app(tmp_path, monkeypatch):
+    """The real app from app.py, backed by a fresh temp database per test.
+
+    Named ``spendly_app`` rather than ``app`` so it neither shadows the bare-app
+    fixture above nor triggers pytest-flask's autouse context push. app.py is
+    imported *inside* the fixture, after DB_PATH is patched, so the module-level
+    init_db()/seed_db() of the first import lands in tmp_path. Test modules must
+    never import app at top level: collection runs before any fixture, and that
+    import would seed the developer's real expense_tracker.db.
+
+    Later tests reuse the cached module, so the schema and demo user are
+    recreated here explicitly on each new temp path.
+    """
+    monkeypatch.setattr(db_module, "DB_PATH", tmp_path / "test_expense_tracker.db")
+    import app as app_module  # deliberately late; see docstring
+
+    flask_app = app_module.app
+    monkeypatch.setitem(flask_app.config, "TESTING", True)
+    with flask_app.app_context():
+        db_module.init_db()
+        db_module.seed_db()
+    return flask_app
+
+
+@pytest.fixture
+def spendly_client(spendly_app):
+    """A test client for the real app. Cookies persist, so flash() round-trips."""
+    return spendly_app.test_client()
