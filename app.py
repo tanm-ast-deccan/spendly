@@ -1,13 +1,23 @@
 import os
 from typing import Optional
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 
-from database.db import create_user, get_user_by_email, init_app, init_db, seed_db
+from database.db import (
+    authenticate_user,
+    create_user,
+    get_user_by_email,
+    init_app,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
-# flash() stores messages in the signed session cookie, so a key is required.
+# flash() and the login session live in the signed session cookie, so a key is
+# required.
 app.secret_key = os.environ.get("SECRET_KEY", "dev-only-change-me")
+# Flask already sets HttpOnly; Lax keeps the cookie off cross-site POSTs.
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 init_app(app)
 
 MIN_PASSWORD_LENGTH = 8
@@ -47,6 +57,8 @@ def landing():
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if request.method == "GET":
+        if "user_id" in session:
+            return redirect(url_for("landing"))
         return render_template("register.html")
 
     name = request.form.get("name", "").strip()
@@ -67,9 +79,42 @@ def register():
     return redirect(url_for("login"))
 
 
-@app.route("/login")
+@app.route("/login", methods=["GET", "POST"])
 def login():
-    return render_template("login.html")
+    if request.method == "GET":
+        if "user_id" in session:
+            return redirect(url_for("landing"))
+        return render_template("login.html")
+
+    email = request.form.get("email", "").strip().lower()
+    password = request.form.get("password", "")
+
+    # Not abort(): the form must re-render with the user's email kept.
+    if not email or not password:
+        return render_template(
+            "login.html", error="Email and password are required.", email=email
+        ), 400
+
+    user = authenticate_user(email, password)
+    if user is None:
+        return render_template(
+            "login.html", error="Invalid email or password.", email=email
+        ), 401
+
+    # Clear first so no pre-login state carries over, and before flash(), which
+    # writes into the session and would otherwise be wiped.
+    session.clear()
+    session["user_id"] = user["id"]
+    session["user_name"] = user["name"]
+    flash(f"Welcome back, {user['name']}.", "success")
+    return redirect(url_for("landing"))
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("You have been signed out.", "success")
+    return redirect(url_for("landing"))
 
 
 @app.route("/terms")
@@ -85,11 +130,6 @@ def privacy():
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
-
-@app.route("/logout")
-def logout():
-    return "Logout — coming in Step 3"
-
 
 @app.route("/profile")
 def profile():

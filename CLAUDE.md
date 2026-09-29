@@ -93,9 +93,9 @@ pytest -s
 | Route | Status |
 |---|---|
 | `GET /` | Implemented — renders `landing.html` |
-| `GET /register` | Implemented — renders `register.html` |
-| `GET /login` | Implemented — renders `login.html` |
-| `GET /logout` | Stub — Step 3 |
+| `GET/POST /register` | Implemented — form; POST creates the user and redirects to `/login` (GET redirects to `/` when logged in) |
+| `GET/POST /login` | Implemented — form; POST signs in via `authenticate_user()` and sets `session["user_id"]` / `session["user_name"]` (GET redirects to `/` when logged in) |
+| `GET /logout` | Implemented — clears the session and redirects to `/` |
 | `GET /profile` | Stub — Step 4 |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
