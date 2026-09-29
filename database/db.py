@@ -175,3 +175,38 @@ def seed_db():
         rows,
     )
     db.commit()
+
+
+def get_user_by_email(email):
+    """Return the ``users`` row for ``email`` as a ``sqlite3.Row``, or ``None``.
+
+    The match is exact: callers normalise the address (strip and lowercase)
+    first, so there is a single place that decides what "the same email" means.
+    Must be called inside an application context.
+    """
+    return get_db().execute(
+        "SELECT id, name, email, password_hash, created_at FROM users WHERE email = ?",
+        (email,),
+    ).fetchone()
+
+
+def create_user(name, email, password):
+    """Insert a user with a hashed password and return the new id.
+
+    The password is hashed with ``PASSWORD_HASH_METHOD`` and never stored as
+    given. Returns ``None`` if the UNIQUE constraint on ``email`` rejects the
+    insert, which covers a race past the caller's :func:`get_user_by_email`
+    check. Must be called inside an application context.
+    """
+    db = get_db()
+    try:
+        cursor = db.execute(
+            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+            (name, email, generate_password_hash(password, method=PASSWORD_HASH_METHOD)),
+        )
+        db.commit()
+    except sqlite3.IntegrityError:
+        # End the failed transaction so the connection cached on g stays usable.
+        db.rollback()
+        return None
+    return cursor.lastrowid
