@@ -20,7 +20,7 @@ from datetime import date
 from pathlib import Path
 
 from flask import g
-from werkzeug.security import generate_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 # db.py lives in database/, so the project root is two levels up. Resolving from
 # __file__ keeps the database in the project root no matter what the current
@@ -49,6 +49,14 @@ DEMO_USER_PASSWORD = "demo123"
 # available everywhere, and still a sound password hash. Stated explicitly so
 # the choice does not silently change with the interpreter.
 PASSWORD_HASH_METHOD = "pbkdf2:sha256"
+
+# Timing guard for authenticate_user(): an unknown email still pays for one full
+# hash check, so response time does not reveal whether the email is registered.
+# Built with the same method (and so the same iterations) as real hashes so the
+# cost matches; computing it once at import costs a fraction of a second.
+_DUMMY_PASSWORD_HASH = generate_password_hash(
+    "spendly-timing-guard", method=PASSWORD_HASH_METHOD
+)
 
 # (day_of_month, amount, category, description)
 # Eight rows covering all seven categories; "Food" appears twice. Day numbers
@@ -210,3 +218,20 @@ def create_user(name, email, password):
         db.rollback()
         return None
     return cursor.lastrowid
+
+
+def authenticate_user(email, password):
+    """Return the ``users`` row if ``password`` is correct for ``email``, else None.
+
+    Callers normalise the email first, as for :func:`get_user_by_email`. Exactly
+    one hash check runs whether or not the email exists, so unknown emails and
+    wrong passwords take the same time. Must be called inside an application
+    context.
+    """
+    user = get_user_by_email(email)
+    if user is None:
+        check_password_hash(_DUMMY_PASSWORD_HASH, password)
+        return None
+    if check_password_hash(user["password_hash"], password):
+        return user
+    return None
